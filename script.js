@@ -667,3 +667,265 @@ function startRound() {
     });
     
     // Set player drawing status
+    Object.keys(gameState.players).forEach(playerId => {
+        database.ref(`rooms/${gameState.roomId}/players/${playerId}/isDrawing`).set(playerId === nextDrawer);
+    });
+    
+    // Add system message
+    addSystemMessage(`New round started! ${gameState.players[nextDrawer].name} is drawing.`);
+    
+    // Start timer
+    startTimer();
+}
+
+function startTimer() {
+    if (gameState.timer) {
+        clearInterval(gameState.timer);
+    }
+    
+    gameState.timer = setInterval(() => {
+        gameState.roundTime--;
+        database.ref(`rooms/${gameState.roomId}/gameState/roundTime`).set(gameState.roundTime);
+        
+        if (gameState.roundTime <= 0) {
+            clearInterval(gameState.timer);
+            endRound();
+        }
+        
+        updateGameDisplay();
+    }, 1000);
+}
+
+function endRound() {
+    if (!gameState.roomId) return;
+    
+    // Add system message
+    if (gameState.currentWord) {
+        addSystemMessage(`Time's up! The word was: ${gameState.currentWord}`);
+    }
+    
+    // Start next round after delay
+    setTimeout(() => {
+        if (gameState.gameStarted) {
+            startRound();
+        }
+    }, 5000);
+}
+
+function playerCanDraw(canDraw) {
+    if (canDraw) {
+        canvas.style.cursor = 'crosshair';
+        wordDisplay.textContent = gameState.currentWord;
+    } else {
+        canvas.style.cursor = 'default';
+        wordDisplay.textContent = '????';
+    }
+}
+
+function updateGameDisplay() {
+    timerDisplay.textContent = `Time: ${gameState.roundTime}s`;
+    updateScoreDisplay();
+    
+    if (gameState.currentDrawer === playerConfig.id) {
+        gameStateDisplay.textContent = "You're drawing!";
+        playerCanDraw(true);
+    } else if (gameState.currentDrawer) {
+        const drawer = gameState.players[gameState.currentDrawer];
+        gameStateDisplay.textContent = `${drawer.name} is drawing!`;
+        playerCanDraw(false);
+    } else {
+        gameStateDisplay.textContent = "Waiting for players...";
+    }
+}
+
+function updateScoreDisplay() {
+    scoreDisplay.textContent = `Score: ${playerConfig.score}`;
+}
+
+function updatePlayersList() {
+    playersList.innerHTML = '';
+    document.getElementById('playerCount').textContent = `(${Object.keys(gameState.players).length})`;
+    
+    Object.entries(gameState.players).forEach(([id, player]) => {
+        const li = document.createElement('li');
+        if (id === playerConfig.id) li.classList.add('you');
+        if (id === gameState.currentDrawer) li.classList.add('drawer');
+        
+        // Create avatar
+        const avatarPreview = document.createElement('div');
+        avatarPreview.className = 'player-avatar';
+        const avatarCanvas = document.createElement('canvas');
+        avatarCanvas.width = 40;
+        avatarCanvas.height = 40;
+        const ctx = avatarCanvas.getContext('2d');
+        drawSmallAvatar(ctx, player.avatar);
+        avatarPreview.appendChild(avatarCanvas);
+        
+        // Player info
+        const playerInfo = document.createElement('div');
+        playerInfo.className = 'player-info';
+        playerInfo.innerHTML = `
+            <span class="player-name">${player.name}</span>
+            <span class="player-score">${player.score} points</span>
+        `;
+        
+        li.appendChild(avatarPreview);
+        li.appendChild(playerInfo);
+        playersList.appendChild(li);
+    });
+}
+
+function drawSmallAvatar(ctx, avatar) {
+    // Simplified version for small avatars
+    ctx.beginPath();
+    ctx.arc(20, 20, 18, 0, Math.PI * 2);
+    ctx.fillStyle = avatar.color;
+    ctx.fill();
+    
+    // Simple face
+    ctx.fillStyle = '#FFFFFF';
+    ctx.beginPath();
+    ctx.arc(15, 15, 3, 0, Math.PI * 2);
+    ctx.arc(25, 15, 3, 0, Math.PI * 2);
+    ctx.fill();
+    
+    // Smile
+    ctx.strokeStyle = '#FFFFFF';
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+    ctx.arc(20, 22, 5, 0.1 * Math.PI, 0.9 * Math.PI);
+    ctx.stroke();
+}
+
+// Drawing synchronization
+function sendDrawingData() {
+    if (currentPath.length > 1 && gameState.roomId) {
+        const lastPoint = currentPath[currentPath.length - 1];
+        database.ref(`rooms/${gameState.roomId}/drawing`).push({
+            x1: currentPath[currentPath.length - 2].x,
+            y1: currentPath[currentPath.length - 2].y,
+            x2: lastPoint.x,
+            y2: lastPoint.y,
+            color: lastPoint.color,
+            size: lastPoint.size
+        });
+    }
+}
+
+function sendFullDrawing() {
+    if (!gameState.roomId) return;
+    
+    // Clear remote drawing
+    database.ref(`rooms/${gameState.roomId}/drawing`).set(null);
+    
+    // Send all strokes
+    drawingHistory.forEach(path => {
+        for (let i = 1; i < path.length; i++) {
+            database.ref(`rooms/${gameState.roomId}/drawing`).push({
+                x1: path[i-1].x,
+                y1: path[i-1].y,
+                x2: path[i].x,
+                y2: path[i].y,
+                color: path[i].color,
+                size: path[i].size
+            });
+        }
+    });
+}
+
+function drawRemoteStroke(stroke) {
+    ctx.strokeStyle = stroke.color;
+    ctx.lineWidth = stroke.size;
+    
+    ctx.beginPath();
+    ctx.moveTo(stroke.x1, stroke.y1);
+    ctx.lineTo(stroke.x2, stroke.y2);
+    ctx.stroke();
+}
+
+// Chat functions
+function sendChatMessage() {
+    const message = chatInput.value.trim();
+    if (message === '' || !gameState.roomId) return;
+    
+    const messageData = {
+        text: message,
+        sender: playerConfig.name,
+        senderId: playerConfig.id,
+        type: 'message'
+    };
+    
+    // Check if message is a guess
+    if (!playerConfig.isDrawing && gameState.currentWord) {
+        const normalizedGuess = message.toLowerCase().trim();
+        const normalizedWord = gameState.currentWord.toLowerCase().trim();
+        
+        if (normalizedGuess === normalizedWord) {
+            messageData.type = 'guess';
+            // Award points
+            const points = Math.floor(gameState.roundTime / 10) * 10 + 50;
+            playerConfig.score += points;
+            database.ref(`rooms/${gameState.roomId}/players/${playerConfig.id}/score`).set(playerConfig.score);
+            
+            // Add correct guess message
+            addSystemMessage(`${playerConfig.name} guessed the word correctly and earned ${points} points!`);
+        }
+    }
+    
+    database.ref(`rooms/${gameState.roomId}/chat`).push(messageData);
+    chatInput.value = '';
+}
+
+function addChatMessage(text, sender, type) {
+    const messageDiv = document.createElement('div');
+    messageDiv.className = `chat-message ${type}`;
+    
+    if (type === 'system') {
+        messageDiv.textContent = text;
+    } else {
+        messageDiv.textContent = `${sender}: ${text}`;
+    }
+    
+    chatMessages.appendChild(messageDiv);
+    chatMessages.scrollTop = chatMessages.scrollHeight;
+}
+
+function addSystemMessage(text) {
+    addChatMessage(text, '', 'system');
+}
+
+function checkGuess(guess, senderId) {
+    if (gameState.currentWord && guess.toLowerCase() === gameState.currentWord.toLowerCase()) {
+        // Award points to guesser
+        const points = Math.floor(gameState.roundTime / 10) * 10 + 50;
+        database.ref(`rooms/${gameState.roomId}/players/${senderId}/score`).transaction((currentScore) => {
+            return (currentScore || 0) + points;
+        });
+        
+        // Award points to drawer
+        const drawerPoints = 25;
+        database.ref(`rooms/${gameState.roomId}/players/${playerConfig.id}/score`).transaction((currentScore) => {
+            return (currentScore || 0) + drawerPoints;
+        });
+        
+        // Add system message
+        addSystemMessage(`${gameState.players[senderId].name} guessed the word correctly and earned ${points} points!`);
+        
+        // End round early
+        clearInterval(gameState.timer);
+        endRound();
+    }
+}
+
+function updateUrlWithRoomCode(roomCode) {
+    const url = new URL(window.location.href);
+    url.searchParams.set('room', roomCode);
+    window.history.pushState({}, '', url);
+}
+
+function generateId() {
+    return Math.random().toString(36).substr(2, 9);
+}
+
+// Start the game
+initGame();
