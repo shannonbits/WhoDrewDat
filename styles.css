@@ -27,6 +27,7 @@ header {
     display: flex;
     flex-direction: column;
     align-items: center;
+    position: relative;
 }
 
 header h1 {
@@ -43,12 +44,14 @@ header h1 .drew {
     margin-top: 0.5rem;
 }
 
-#timer {
+#timer, #score {
     background-color: var(--accent-color);
     padding: 0.3rem 1rem;
     border-radius: 20px;
     margin-top: 0.5rem;
     font-weight: bold;
+    display: inline-block;
+    margin: 0.5rem 0.5rem 0 0;
 }
 
 .game-area {
