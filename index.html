@@ -1,0 +1,109 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>WhoDrewDat - The Drawing & Guessing Game</title>
+    <link rel="stylesheet" href="styles.css">
+    <link href="https://fonts.googleapis.com/css2?family=Comic+Neue:wght@400;700&display=swap" rel="stylesheet">
+</head>
+<body>
+    <header>
+        <h1>Who<span class="drew">Drew</span>Dat?</h1>
+        <div id="gameState">Waiting for players...</div>
+        <div id="timer">Time: 60s</div>
+    </header>
+
+    <main>
+        <div class="game-area" style="display:none;">
+            <div class="canvas-container">
+                <canvas id="drawingCanvas" width="800" height="500"></canvas>
+                <div class="word-display" id="wordDisplay">????</div>
+                <div class="drawing-tools">
+                    <input type="color" id="colorPicker" value="#000000">
+                    <input type="range" id="brushSize" min="1" max="30" value="5">
+                    <button id="clearBtn">🧹 Clear</button>
+                    <button id="undoBtn">↩️ Undo</button>
+                </div>
+            </div>
+
+            <div class="sidebar">
+                <div class="players-container">
+                    <h3>Artists <span id="playerCount">(0)</span></h3>
+                    <ul id="playersList"></ul>
+                </div>
+                
+                <div class="chat-container">
+                    <div id="chatMessages"></div>
+                    <div class="chat-input">
+                        <input type="text" id="chatInput" placeholder="Type your guess...">
+                        <button id="sendBtn">Send</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </main>
+
+    <div id="lobbyModal" class="modal">
+        <div class="modal-content">
+            <h2>Welcome to WhoDrewDat!</h2>
+            
+            <div class="customization-section">
+                <div class="avatar-preview" id="avatarPreview"></div>
+                
+                <div class="customization-options">
+                    <div class="form-group">
+                        <label for="usernameInput">Your Name:</label>
+                        <input type="text" id="usernameInput" placeholder="Artist Name" maxlength="15">
+                    </div>
+                    
+                    <div class="form-group">
+                        <label>Avatar Style:</label>
+                        <select id="avatarStyle">
+                            <option value="simple">Simple</option>
+                            <option value="animal">Animal</option>
+                            <option value="robot">Robot</option>
+                            <option value="monster">Monster</option>
+                        </select>
+                    </div>
+                    
+                    <div class="form-group">
+                        <label>Main Color:</label>
+                        <input type="color" id="avatarColor" value="#6a5acd">
+                    </div>
+                    
+                    <div class="form-group">
+                        <label>Accessory:</label>
+                        <select id="avatarAccessory">
+                            <option value="none">None</option>
+                            <option value="hat">Hat</option>
+                            <option value="glasses">Glasses</option>
+                            <option value="crown">Crown</option>
+                        </select>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="room-options">
+                <div class="form-group">
+                    <input type="text" id="roomCodeInput" placeholder="Enter room code">
+                    <button id="joinRoomBtn">Join Room</button>
+                </div>
+                <div class="divider">OR</div>
+                <button id="createRoomBtn">Create New Room</button>
+            </div>
+
+            <div id="roomInfo" class="room-info" style="display:none;">
+                <h3>Room Created!</h3>
+                <p>Share this code with friends:</p>
+                <div class="room-code" id="roomCodeDisplay"></div>
+                <button id="startGameBtn">Start Game</button>
+            </div>
+        </div>
+    </div>
+
+    <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-app.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-database.js"></script>
+    <script src="script.js"></script>
+</body>
+</html>
