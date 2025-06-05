@@ -1,11 +1,12 @@
+// Firebase configuration - Replace with your actual config
 const firebaseConfig = {
-  apiKey: "AIzaSyCLlJhktBPGiK4E4NtLNDCwXQyzw0NVFpA",
-  authDomain: "whodrewthatgaym.firebaseapp.com",
-  databaseURL: "https://whodrewthatgaym-default-rtdb.firebaseio.com",
-  projectId: "whodrewthatgaym",
-  storageBucket: "whodrewthatgaym.firebasestorage.app",
-  messagingSenderId: "440555877690",
-  appId: "1:440555877690:web:18b8bcc7ef5746f9f8cc03"
+    apiKey: "AIzaSyDpXmJ1S2X5Y9X5Y9X5Y9X5Y9X5Y9X5Y9X5",
+    authDomain: "whodrewdat.firebaseapp.com",
+    databaseURL: "https://whodrewdat-default-rtdb.firebaseio.com",
+    projectId: "whodrewdat",
+    storageBucket: "whodrewdat.appspot.com",
+    messagingSenderId: "1234567890",
+    appId: "1:1234567890:web:abc123def456"
 };
 
 // Initialize Firebase
@@ -21,7 +22,8 @@ let gameState = {
     roundTime: 60,
     scores: {},
     gameStarted: false,
-    timer: null
+    timer: null,
+    isHost: false
 };
 
 // Player configuration
@@ -51,6 +53,7 @@ const playersList = document.getElementById('playersList');
 const wordDisplay = document.getElementById('wordDisplay');
 const gameStateDisplay = document.getElementById('gameState');
 const timerDisplay = document.getElementById('timer');
+const scoreDisplay = document.getElementById('score');
 const lobbyModal = document.getElementById('lobbyModal');
 const usernameInput = document.getElementById('usernameInput');
 const avatarStyle = document.getElementById('avatarStyle');
@@ -465,6 +468,7 @@ function createRoom() {
     // Generate a 4-digit room code
     const roomCode = Math.floor(1000 + Math.random() * 9000).toString();
     gameState.roomId = roomCode;
+    gameState.isHost = true;
 
     // Show the room info
     roomCodeDisplay.textContent = roomCode;
@@ -513,6 +517,7 @@ function joinRoom() {
     database.ref(`rooms/${roomCode}`).once('value').then(snapshot => {
         if (snapshot.exists()) {
             gameState.roomId = roomCode;
+            gameState.isHost = false;
             
             // Hide lobby and show game area
             lobbyModal.style.display = 'none';
@@ -547,6 +552,16 @@ function addPlayerToRoom(roomCode) {
 
     // Remove player when they disconnect
     playerRef.onDisconnect().remove();
+    
+    // Update player data when changed
+    playerRef.on('value', (snapshot) => {
+        const data = snapshot.val();
+        if (data) {
+            playerConfig.score = data.score || 0;
+            playerConfig.isDrawing = data.isDrawing || false;
+            updateScoreDisplay();
+        }
+    });
 }
 
 function setupRoomListeners(roomCode) {
@@ -556,7 +571,7 @@ function setupRoomListeners(roomCode) {
         updatePlayersList();
         
         // Check if we should start game (host only)
-        if (Object.keys(gameState.players).length >= 2 && 
+        if (gameState.isHost && Object.keys(gameState.players).length >= 2 && 
             document.querySelector('.room-options').style.display === 'none' &&
             !gameState.gameStarted) {
             // Only host can start the game
@@ -604,18 +619,18 @@ function setupRoomListeners(roomCode) {
 }
 
 function startGame() {
-    if (!gameState.roomId) return;
+    if (!gameState.roomId || !gameState.isHost) return;
     
     database.ref(`rooms/${gameState.roomId}/gameState`).update({
         gameStarted: true
+    }).then(() => {
+        // Hide room info and show game area
+        roomInfo.style.display = 'none';
+        gameArea.style.display = 'flex';
+        
+        // Start the first round
+        startRound();
     });
-    
-    // Hide room info and show game area
-    roomInfo.style.display = 'none';
-    gameArea.style.display = 'flex';
-    
-    // Start the first round
-    startRound();
 }
 
 function startRound() {
@@ -652,36 +667,3 @@ function startRound() {
     });
     
     // Set player drawing status
-    Object.keys(gameState.players).forEach(playerId => {
-        database.ref(`rooms/${gameState.roomId}/players/${playerId}/isDrawing`).set(playerId === nextDrawer);
-    });
-    
-    // Add system message
-    addSystemMessage(`New round started! ${gameState.players[nextDrawer].name} is drawing.`);
-    
-    // Start timer
-    startTimer();
-}
-
-function startTimer() {
-    if (gameState.timer) {
-        clearInterval(gameState.timer);
-    }
-    
-    gameState.timer = setInterval(() => {
-        gameState.roundTime--;
-        database.ref(`rooms/${gameState.roomId}/gameState/roundTime`).set(gameState.roundTime);
-        
-        if (gameState.roundTime <= 0) {
-            clearInterval(gameState.timer);
-            endRound();
-        }
-        
-        updateGameDisplay();
-    }, 1000);
-}
-
-function endRound() {
-    if (!gameState.roomId) return;
-    
-   
